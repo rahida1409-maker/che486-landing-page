@@ -55,8 +55,12 @@ main h2::after{content:"";display:block;width:80px;height:4px;border-radius:4px;
 .flow:has(>.step:not(.st)){display:grid;grid-template-columns:1fr 18px 1fr 18px 1fr;gap:8px 0;align-items:stretch}
 .flow:has(>.step:not(.st))>.chev{display:flex;align-items:center;justify-content:center;flex:none}
 .flow:has(>.step:not(.st))>.chev svg{transform:none;width:18px;height:18px}
-.flow:has(>.step:not(.st))>.chev:nth-child(6){grid-column:1/-1;justify-content:center}
+.flow:has(>.step:not(.st))>.chev:nth-child(6){grid-row:2;grid-column:5}
 .flow:has(>.step:not(.st))>.chev:nth-child(6) svg{transform:rotate(90deg)}
+.flow:has(>.step:not(.st))>:nth-child(7){grid-row:3;grid-column:5}
+.flow:has(>.step:not(.st))>.chev:nth-child(8){grid-row:3;grid-column:4}
+.flow:has(>.step:not(.st))>.chev:nth-child(8) svg{transform:rotate(180deg)}
+.flow:has(>.step:not(.st))>:nth-child(9){grid-row:3;grid-column:3}
 .flow>.step:not(.st){padding:14px 8px 10px!important;min-width:0}
 .flow>.step:not(.st)>span:first-child{font-size:11px!important;padding:1px 8px!important}
 .flow>.step:not(.st)>div:nth-child(2){width:38px!important;height:38px!important;margin-top:10px!important}
