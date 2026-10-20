@@ -216,9 +216,11 @@ main .rc-h::after{margin-left:auto;margin-right:auto}
 </style>
 
 <style>@media (min-width:900px){#app{zoom:0.9}}@media (max-width:640px){#app{zoom:0.85}.rt-grid{grid-template-columns:repeat(3,1fr)!important;gap:8px!important}.rt{padding:22px 8px 14px!important;align-items:center!important;text-align:center}.rt-ico{width:40px!important;height:40px!important;margin-bottom:6px!important}.rt-ico svg{width:20px!important;height:20px!important}.rt-code{font-size:30px!important}.rt-name{font-size:15px!important;padding-top:8px!important;margin-top:4px!important}}@media (max-width:760px){nav[aria-label="Page navigation"]{padding-top:10px;padding-bottom:0;gap:0 12px!important;justify-content:space-between!important}nav[aria-label="Page navigation"]>span{order:1;font-size:16px!important}nav[aria-label="Page navigation"]>a{order:2;min-height:38px!important;padding:0 16px!important;font-size:15px!important}.navlinks{display:flex!important;order:3;flex:0 0 100%;flex-wrap:nowrap!important;overflow-x:auto;gap:0 22px!important;margin:0 -24px;padding:0 24px;-webkit-overflow-scrolling:touch;scrollbar-width:none}.navlinks::-webkit-scrollbar{display:none}.navlink{white-space:nowrap;flex:0 0 auto;padding:12px 0!important;font-size:15px!important}html{scroll-padding-top:96px}}</style>
+<script data-goatcounter="https://che486-rahida.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 <div id="app"></div>
+<p class="gc-note" style="margin:0;padding:18px 24px 26px;text-align:center;background:#D8DFE1;color:#4A5F6D;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px">CHE486 Fluid Mechanics and Thermodynamics Laboratory &middot; Faculty of Chemical Engineering, UiTM &middot; This page records anonymous usage statistics (no personal data).</p>
 <script>
 
 class DCLogic{constructor(){this.props={defaultGroup:"1"};this.state={};}
@@ -519,6 +521,31 @@ function render(){H.length=0;const html=expand(TPL,comp.renderVals());
  for(let k=0;k<a.length;k++){if(a[k].outerHTML!==b[k].outerHTML){app.replaceChild(b[k],a[k]);}}
  }
 comp._r=render;render();(function(){var m=innerWidth<=640;addEventListener('resize',function(){var n=innerWidth<=640;if(n!==m){m=n;render();}});})();
+})();
+
+
+/* ===== anonymous usage statistics (GoatCounter) ===== */
+(function(){
+function gc(o){var n=0;(function go(){if(window.goatcounter&&window.goatcounter.count){try{window.goatcounter.count(o);}catch(e){}}else if(n++<40){setTimeout(go,250);}})();}
+function ev(name){gc({path:'click/'+name,title:name,event:true});}
+var IDS=['mula','pautan','jadual','aliran','penilaian','pensyarah','bantuan'],seen={},tick=null;
+function check(){tick=null;var vh=window.innerHeight||document.documentElement.clientHeight;
+IDS.forEach(function(id){if(seen[id])return;var e=document.getElementById(id);if(!e)return;var r=e.getBoundingClientRect();
+var vis=Math.min(r.bottom,vh)-Math.max(r.top,0);if(vis>0&&(vis>=0.35*Math.min(r.height,vh))){seen[id]=1;gc({path:'/section/'+id,title:'CHE486 section: '+id});}});}
+function sched(){if(!tick)tick=setTimeout(check,400);}
+window.addEventListener('scroll',sched,{passive:true});window.addEventListener('resize',sched);setTimeout(check,1500);
+var MAP=[['1ZZ58coq','syllabus-lesson-plan'],['1md0rahA','schedule-pdf'],['isyarah.com','announcements'],['youtube.com','demo-videos'],['11EsaugwI','manual-report-template'],['picktime.com','booking-lab-staff']];
+document.addEventListener('click',function(e){
+var t=e.target;if(!t||!t.closest)return;
+var a=t.closest('a[href]');
+if(a){var h=a.getAttribute('href')||'',n='';
+for(var i=0;i<MAP.length;i++){if(h.indexOf(MAP[i][0])>-1){n=MAP[i][1];break;}}
+if(n==='schedule-pdf'&&!a.classList.contains('ql'))n='ufuture-link';
+if(!n&&a.classList.contains('navlink'))n='nav-'+h.replace('#','');
+if(!n&&h==='#penilaian')n='quick-assessment';
+if(n)ev(n);}
+var b=t.closest('button');if(b){var m=/^Group (\d)$/.exec((b.textContent||'').trim());if(m)ev('group-'+m[1]);}
+});
 })();
 
 </script>
