@@ -523,28 +523,60 @@ function progStatus(G,total,k){
  if(G.rev)return [G.ov?'Revealed by you':'Revealed','warn'];
  var d=G.members.filter(function(m){return progDone(m,total)}).length;
  return [d+' of '+G.members.length+' done',k==='soon'?'mute':'blue']}
+/* v26: Student progress shows every group on its own current lab (no lab picker needed) */
+function progFocus(g,today){
+ var ws={};LEC.weeks.forEach(function(z){ws[z.week]=z.start_date});
+ var rs=LEC.sched.filter(function(z){return z.group_no===g}).sort(function(a,b){return ws[a.week]<ws[b.week]?-1:1});
+ var cur=null,nx=null,last=null;
+ rs.forEach(function(r){var k=lecState(r,today).k;if((k==='open'||k==='shut')&&!cur)cur=r;else if(k==='soon'&&!nx)nx=r;else if(k==='past')last=r});
+ return cur||nx||last||null}
+function progAll(today){
+ var gs=[],items=[],need={},loading=false,err='';
+ LEC.sched.forEach(function(r){if(gs.indexOf(r.group_no)<0)gs.push(r.group_no)});gs.sort(function(a,b){return a-b});
+ gs.forEach(function(g){var r=progFocus(g,today);if(r){need[r.lab_code]=1;items.push({g:g,lab:r.lab_code})}});
+ Object.keys(need).forEach(function(l){var P=PROG[l];if(!P){progLoad(l);loading=true}else if(P.loading)loading=true;else if(P.err)err=P.err});
+ return {items:items,loading:loading,err:err}}
+function progList(A){var out=[];A.items.forEach(function(it){var P=PROG[it.lab],G=P&&P.groups?P.groups.filter(function(z){return z.g===it.g})[0]:null;if(G)out.push({G:G,lab:it.lab,total:P.total})});return out}
+function progTiles(list){
+ var nAll=0,nCons=0,nReg=0,nMem=0;
+ list.forEach(function(it){var G=it.G;if(G.cons)nCons++;if(G.members.length&&G.members.every(function(m){return progDone(m,it.total)}))nAll++;G.members.forEach(function(m){nMem++;if(m.reg)nReg++})});
+ return '<div class="pg-tiles"><div class="pg-t"><b>'+list.length+'</b><span>Groups</span></div><div class="pg-t"><b>'+nAll+' / '+list.length+'</b><span>All members answered</span></div><div class="pg-t"><b>'+nCons+' / '+list.length+'</b><span>Group answer recorded</span></div><div class="pg-t"><b>'+nReg+' / '+nMem+'</b><span>Students signed up</span></div></div>'}
+function progCard(it,today,title,showLab){
+ var G=it.G,lab=it.lab,total=it.total;
+ var row=LEC.sched.filter(function(z){return z.group_no===G.g&&z.lab_code===lab})[0],st=row?lecState(row,today):{k:'soon',ov:false},stn={open:['Open','ok'],soon:['Upcoming','blue'],past:['Past','mute'],shut:['Closed','warn']}[st.k],ps=progStatus(G,total,st.k);
+ var rows=G.members.map(function(m){var pct=total?Math.min(100,Math.round(m.n/total*100)):0;
+  return '<li><span class="av">'+esc((m.name||'?').charAt(0))+'</span><div class="nm"><b>'+esc(m.name)+'</b><small>'+(m.reg?(total?m.n+' of '+total+' answered':'No questions'):'Not signed up yet')+'</small>'+(total&&m.reg?'<div class="pg-bar"><i style="width:'+pct+'%"></i></div>':'')+'</div>'+(!m.reg?chipx('Not signed up','warn'):(progDone(m,total)?chipx('Done','ok'):''))+'</li>'}).join('');
+ var btn='';if(total>0&&!G.cons){if(G.ov)btn='<button class="pg-btn" data-rv="'+G.g+'|hide|'+lab+'">Remove early reveal</button>';else if(!G.rev)btn='<button class="pg-btn" data-rv="'+G.g+'|show|'+lab+'">Reveal answers now</button>'}
+ if(total>0)btn='<button class="pg-btn" data-pg="'+G.g+'" data-lab="'+lab+'">Consultation</button>'+btn;
+ var lb=showLab?'<div style="font-size:12px;color:#5C638F;margin:0 0 8px"><b style="color:#1B2140">'+esc(lab)+'</b> '+esc(title[lab]||'')+'</div>':'';
+ return '<article class="pg-card"><div class="pg-h"><span class="gc">G'+G.g+'</span><b>Group '+G.g+'</b><span class="pg-wk">Week '+(row?row.week:'')+'</span>'+chipx(stn[0],stn[1])+'</div>'+lb+'<ul>'+(rows||'<li class="pn-e">No students in the roster for this group.</li>')+'</ul><div class="pg-f">'+chipx(ps[0],ps[1])+btn+'</div></article>'}
+function progAtt(list,today,showLab,limit){
+ var att=list.filter(function(it){var row=LEC.sched.filter(function(z){return z.group_no===it.G.g&&z.lab_code===it.lab})[0],k=row?lecState(row,today).k:'soon';return it.total>0&&!it.G.cons&&(k==='open'||k==='past')});
+ var anyQ=list.some(function(it){return it.total>0}),shown=limit?att.slice(0,limit):att;
+ return '<section class="pn"><div class="pn-h"><h2>Needs attention</h2><span>'+att.length+'</span></div>'+(att.length?'<ul>'+shown.map(function(it){var G=it.G,d=G.members.filter(function(m){return progDone(m,it.total)}).length,ns=G.members.filter(function(m){return !m.reg}).length;return pnRow('<span class="gc">G'+G.g+'</span>','<b>Group '+G.g+'</b><small>'+(showLab?esc(it.lab)+' · ':'')+(ns?ns+' not signed up · ':'')+d+' of '+G.members.length+' done</small>',chipx(G.rev?'No group answer':'Answers pending','warn'))}).join('')+'</ul>':'<p class="pn-e">'+(anyQ?'Every group whose lab is open or past has a group answer.':'Nothing to check until questions are added.')+'</p>')+'</section>'}
 function progView(labs,title,today){
- var lab=PLAB||(PLAB=progDefault()),P=PROG[lab];if(!P)progLoad(lab);
- var sel='<div class="pg-labs">'+progLabs().map(function(l){return '<button class="pg-lab'+(l===lab?' on':'')+'" data-pl="'+l+'"><b>'+l+'</b> '+esc(SHORT[l]||'')+'</button>'}).join('')+'</div>';
- if(PGRP!==null&&P&&!P.loading&&!P.err){var pgv=pgView(lab,title,today,P);if(pgv)return pgv}
- var head='<div class="vh"><h2>Student progress</h2><div>'+esc(lab)+' '+esc(title[lab]||'')+'</div></div>'+sel+'<div id="pg-err"></div>';
- if(!P||P.loading)return {main:head+'<div class="ld-card"><div class="pn-e">Loading progress…</div></div>',side:''};
- if(P.err)return {main:head+'<div class="box r">Could not load progress: '+esc(P.err)+'</div>',side:''};
- var total=P.total,gs=P.groups,nAll=0,nCons=0,nReg=0,nMem=0;
- gs.forEach(function(G){if(G.cons)nCons++;if(G.members.length&&G.members.every(function(m){return progDone(m,total)}))nAll++;G.members.forEach(function(m){nMem++;if(m.reg)nReg++})});
- var tiles='<div class="pg-tiles"><div class="pg-t"><b>'+gs.length+'</b><span>Groups</span></div><div class="pg-t"><b>'+nAll+' / '+gs.length+'</b><span>All members answered</span></div><div class="pg-t"><b>'+nCons+' / '+gs.length+'</b><span>Group answer recorded</span></div><div class="pg-t"><b>'+nReg+' / '+nMem+'</b><span>Students signed up</span></div></div>';
- var note=total===0?'<div class="box" style="margin-bottom:12px">No questions have been added for '+esc(lab)+' yet, so there is nothing to answer. Add them to the questions table; progress will appear here.</div>':'';
- var cards=gs.map(function(G){
-  var row=LEC.sched.filter(function(z){return z.group_no===G.g&&z.lab_code===lab})[0],st=row?lecState(row,today):{k:'soon',ov:false},stn={open:['Open','ok'],soon:['Upcoming','blue'],past:['Past','mute'],shut:['Closed','warn']}[st.k],ps=progStatus(G,total,st.k);
-  var rows=G.members.map(function(m){var pct=total?Math.min(100,Math.round(m.n/total*100)):0;
-   return '<li><span class="av">'+esc((m.name||'?').charAt(0))+'</span><div class="nm"><b>'+esc(m.name)+'</b><small>'+(m.reg?(total?m.n+' of '+total+' answered':'No questions'):'Not signed up yet')+'</small>'+(total&&m.reg?'<div class="pg-bar"><i style="width:'+pct+'%"></i></div>':'')+'</div>'+(!m.reg?chipx('Not signed up','warn'):(progDone(m,total)?chipx('Done','ok'):''))+'</li>'}).join('');
-  var btn='';if(total>0&&!G.cons){if(G.ov)btn='<button class="pg-btn" data-rv="'+G.g+'|hide">Remove early reveal</button>';else if(!G.rev)btn='<button class="pg-btn" data-rv="'+G.g+'|show">Reveal answers now</button>'}
-  if(total>0)btn='<button class="pg-btn" data-pg="'+G.g+'">Consultation</button>'+btn;
-  return '<article class="pg-card"><div class="pg-h"><span class="gc">G'+G.g+'</span><b>Group '+G.g+'</b><span class="pg-wk">Week '+(row?row.week:'')+'</span>'+chipx(stn[0],stn[1])+'</div><ul>'+(rows||'<li class="pn-e">No students in the roster for this group.</li>')+'</ul><div class="pg-f">'+chipx(ps[0],ps[1])+btn+'</div></article>'}).join('');
- var att=gs.filter(function(G){var row=LEC.sched.filter(function(z){return z.group_no===G.g&&z.lab_code===lab})[0],k=row?lecState(row,today).k:'soon';return total>0&&!G.cons&&(k==='open'||k==='past')});
- var side='<section class="pn"><div class="pn-h"><h2>Needs attention</h2><span>'+att.length+'</span></div>'+(att.length?'<ul>'+att.map(function(G){var d=G.members.filter(function(m){return progDone(m,total)}).length,ns=G.members.filter(function(m){return !m.reg}).length;return pnRow('<span class="gc">G'+G.g+'</span>','<b>Group '+G.g+'</b><small>'+(ns?ns+' not signed up · ':'')+d+' of '+G.members.length+' done</small>',chipx(G.rev?'No group answer':'Answers pending','warn'))}).join('')+'</ul>':'<p class="pn-e">'+(total?'Every group whose lab is open or past has a group answer.':'Nothing to check until questions are added.')+'</p>')+'</section>'+
-  '<section class="pn"><div class="pn-h"><h2>How it works</h2></div><p class="pn-e">Teammates\' answers stay hidden until every member of the group has answered every question, or you reveal them. After that, students can no longer edit their own answers. This list shows counts; open Consultation on a group to read its answers next to your reference.</p></section>';
- return {main:head+note+tiles+'<div class="pg-grid">'+cards+'</div>',side:side}}
+ var lab=PLAB,P=lab?PROG[lab]:null;if(lab&&!P)progLoad(lab);
+ var sel='<div class="pg-labs"><button class="pg-lab'+(!lab?' on':'')+'" data-pl="">All groups</button>'+progLabs().map(function(l){return '<button class="pg-lab'+(l===lab?' on':'')+'" data-pl="'+l+'"><b>'+l+'</b> '+esc(SHORT[l]||'')+'</button>'}).join('')+'</div>';
+ if(lab&&PGRP!==null&&P&&!P.loading&&!P.err){var pgv=pgView(lab,title,today,P);if(pgv)return pgv}
+ var sub=lab?esc(lab)+' '+esc(title[lab]||''):'All groups · each on its own current lab';
+ var head='<div class="vh"><h2>Student progress</h2><div>'+sub+'</div></div>'+sel+'<div id="pg-err"></div>';
+ var list=[],A=null;
+ if(lab){
+  if(!P||P.loading)return {main:head+'<div class="ld-card"><div class="pn-e">Loading progress…</div></div>',side:''};
+  if(P.err)return {main:head+'<div class="box r">Could not load progress: '+esc(P.err)+'</div>',side:''};
+  list=P.groups.map(function(G){return {G:G,lab:lab,total:P.total}});
+ }else{
+  A=progAll(today);
+  if(A.loading)return {main:head+'<div class="ld-card"><div class="pn-e">Loading progress…</div></div>',side:''};
+  if(A.err)return {main:head+'<div class="box r">Could not load progress: '+esc(A.err)+'</div>',side:''};
+  list=progList(A);
+ }
+ var noQ=[];list.forEach(function(it){if(it.total===0&&noQ.indexOf(it.lab)<0)noQ.push(it.lab)});
+ var note=noQ.length?'<div class="box" style="margin-bottom:12px">No questions have been added for '+noQ.map(esc).join(', ')+' yet, so there is nothing to answer there. Add them to the questions table; progress will appear here.</div>':'';
+ var cards=list.map(function(it){return progCard(it,today,title,!lab)}).join('');
+ var side=progAtt(list,today,!lab,0)+
+  '<section class="pn"><div class="pn-h"><h2>How it works</h2></div><p class="pn-e">Each group is shown on its own lab: the one open now, otherwise the next one, otherwise the last one. Teammates\' answers stay hidden until every member of the group has answered every question, or you reveal them. After that, students can no longer edit their own answers. This list shows counts; open Consultation on a group to read its answers next to your reference.</p></section>';
+ return {main:head+note+progTiles(list)+'<div class="pg-grid">'+cards+'</div>',side:side}}
 
 /* ===== v19: Content (lecturer desktop): edit questions ===== */
 var CQ={},CLAB=null,CKIND={concept:'Concept',expected:'Expected',plan:'Plan'};
@@ -662,8 +694,8 @@ function contInput(e){
 /* ===== v22: lecturer reference and guide (read only) =====
    Data is fetched from Supabase only after a lecturer sign-in, and only when a Reference panel is opened
    or the Guide tab is chosen. Nothing here is stored in this file, so students never receive it. */
-var REF={},GUIDE={},PGRP=null,PGD={},RFO={},CTAB='q',CRO={};
-function refReset(){REF={};GUIDE={};PGRP=null;PGD={};RFO={};CTAB='q';CRO={};var l=document.getElementById('lec');if(l)l.innerHTML=''}
+var REF={},GUIDE={},PGRP=null,PFROM=0,PGD={},RFO={},CTAB='q',CRO={};
+function refReset(){REF={};GUIDE={};PGRP=null;PFROM=0;PGD={};RFO={};CTAB='q';CRO={};var l=document.getElementById('lec');if(l)l.innerHTML=''}
 function refCan(){return !!(LEC&&LEC.token&&!(LIVE&&LIVE.preview))}
 function refRerender(){if(refCan()&&$('lec').style.display==='block'&&LEC_DESK&&(LVIEW==='prog'||LVIEW==='cont')){var st=$('lec').scrollTop;renderLecturerDesk();$('lec').scrollTop=st}}
 function refText(v){
@@ -779,9 +811,9 @@ function refClick(e){
   if(RFO[key]&&(!REF[PLAB]||REF[PLAB].err))refLoad(PLAB,true);redo();return true}
  if(t.closest('[data-rfr]')){refLoad(PLAB,true);redo();return true}
  if(t.closest('[data-gdr]')){guideLoad(CLAB,true);redo();return true}
- if(b=t.closest('[data-pg]')){PGRP=+b.getAttribute('data-pg');pgLoad(PLAB,PGRP);redo(true);return true}
+ if(b=t.closest('[data-pg]')){PGRP=+b.getAttribute('data-pg');var lb=b.getAttribute('data-lab');if(lb&&!PLAB){PLAB=lb;PFROM=1}pgLoad(PLAB,PGRP);redo(true);return true}
  if(t.closest('[data-pgr]')){pgLoad(PLAB,PGRP,true);redo();return true}
- if(t.closest('[data-pgb]')){PGRP=null;redo(true);return true}
+ if(t.closest('[data-pgb]')){PGRP=null;if(PFROM){PLAB=null;PFROM=0}redo(true);return true}
  if(b=t.closest('[data-ctab]')){contSync();CTAB=b.getAttribute('data-ctab');redo(true);return true}
  return false}
 
@@ -810,21 +842,20 @@ function renderLecturerDesk(){
   foot:'<button class="sb-prev" id="lec-prev">Preview as student</button>',user:{i:esc((L.name||'L').charAt(0).toUpperCase()),n:L.name||'Lecturer',s:SEED.course.code},out:'id="lec-out"',outl:'Sign out'});
  var openList=function(){return '<section class="pn"><div class="pn-h"><h2>Open now</h2><span>'+opens.length+'</span></div>'+(opens.length?'<ul>'+opens.map(function(o){return pnRow('<span class="gc">G'+o.g+'</span>','<b>'+o.lab+'</b> '+esc(title[o.lab]||''),o.ov?chipx('Override','warn'):'')}).join('')+'</ul>':'<p class="pn-e">No lab is open this week.</p>')+'</section>'};
  var content='';
- var dl=progDefault(),DP=PROG[dl];if(LVIEW==='dash'&&!DP)progLoad(dl);
+var dA=LVIEW==='dash'?progAll(today):null;
  if(LVIEW==='dash'){
   var ban='<section class="bn lec"><div class="bn-l"><div class="bn-e">'+esc(SEED.course.code+' · '+SEED.course.section)+' · Lecturer</div><h1>'+(wk?'Week '+wk.week+' · '+esc(KIND[wk.kind]||wk.kind):'Outside the teaching weeks')+'</h1><p>'+(opens.length?opens.length+' lab session'+(opens.length>1?'s are':' is')+' open now.':'No lab is open this week.')+(nxt?' The next lab week starts on '+fmtD(nxt)+'.':'')+'</p><div class="bn-c">'+(opens.length?'<span class="g">'+opens.length+' open now</span>':'<span>No lab open</span>')+'<span>'+groups.length+' groups</span></div></div>'+
    '<div class="bn-r"><div class="bn-row"><div class="bn-t"><span>Labs open now</span><b>'+opens.length+'</b></div><div class="bn-t"><span>Next lab week</span><b>'+(nxt?fmtD(nxt):'None')+'</b></div></div><div class="bn-t"><span>Next report due</span><b style="font-size:16px">'+(dues[0]?fmtD(dues[0])+' · '+wtxt(dues[0]):'None')+'</b></div></div></section>';
   var boxes='<section class="bxg" aria-label="Lecturer tools">'+
    boxx({n:1,t:'Open now',hl:true,chip:chipx(opens.length+' open',opens.length?'ok':'mute'),d:opens.length?opens.slice(0,4).map(function(o){return 'G'+o.g+' '+o.lab}).join(', ')+(opens.length>4?' and more':'')+' open now.':'No lab is open this week. Open one early for a group when a session must start outside the schedule.',btn:bxBtn('Open a lab for a group','data-lv="sched"',true)})+
    boxx({n:2,t:'Schedule',chip:chipx(groups.length+' groups','blue'),d:'Group by week table. Click a lab to open or close it for that group, or go back to the schedule.',x:'<div class="bx-x">Weeks '+weeks[0]+' to '+weeks[weeks.length-1]+' · '+Object.keys(labsUsed).length+' labs</div>',btn:bxBtn('Open schedule','data-lv="sched"',false)})+
-   (function(){var ok=DP&&!DP.loading&&!DP.err,nA=0,nC=0;if(ok)DP.groups.forEach(function(G){if(G.cons)nC++;if(G.members.length&&G.members.every(function(m){return progDone(m,DP.total)}))nA++});
-   return boxx({n:3,t:'Student progress',chip:ok?(DP.total?chipx(nC+' of '+DP.groups.length+' ready',nC===DP.groups.length?'ok':'warn'):chipx('No questions','mute')):chipx(DP&&DP.err?'Unavailable':'Loading','mute'),d:'Who has answered the concept questions and which groups have a group answer, before their lab.',x:'<div class="bx-x">'+esc(dl)+' '+esc(title[dl]||'')+(ok&&DP.total?' · '+nA+' of '+DP.groups.length+' groups fully answered':'')+'</div>',btn:bxBtn('View progress','data-lv="prog"',false)})})()+
+   (function(){var ok=dA&&!dA.loading&&!dA.err,nA=0,nC=0,ls=ok?progList(dA):[],anyQ=false;ls.forEach(function(it){if(it.total>0)anyQ=true;if(it.G.cons)nC++;if(it.G.members.length&&it.G.members.every(function(m){return progDone(m,it.total)}))nA++});
+   return boxx({n:3,t:'Student progress',chip:ok?(anyQ?chipx(nC+' of '+ls.length+' ready',nC===ls.length?'ok':'warn'):chipx('No questions','mute')):chipx(dA&&dA.err?'Unavailable':'Loading','mute'),d:'Who has answered the concept questions and which groups have a group answer, before their lab. Each group is shown on its own lab.',x:'<div class="bx-x">All groups'+(ok&&anyQ?' · '+nA+' of '+ls.length+' groups fully answered':'')+'</div>',btn:bxBtn('View progress','data-lv="prog"',false)})})()+
    boxx({n:4,t:'Reports',off:true,chip:chipx('Coming soon','mute'),d:'Reports submitted by each group, with due dates, ready for marking.',x:dues[0]?'<div class="bx-x">Next due '+fmtD(dues[0])+'</div>':''})+'</section>';
   var side='<section class="pn"><div class="pn-h"><h2>Next lab week</h2><span>'+(nxt?fmtD(nxt):'')+'</span></div>'+(nrows.length?'<ul>'+nrows.map(function(r){return pnRow('<span class="gc">G'+r.group_no+'</span>','<b>'+r.lab_code+'</b> '+esc(SHORT[r.lab_code]||title[r.lab_code]||''),chipx('Week '+r.week,'blue'))}).join('')+'</ul>':'<p class="pn-e">No later lab week.</p>')+'</section>'+
    '<section class="pn"><div class="pn-h"><h2>Report deadlines</h2><span>All groups</span></div>'+(dues.length?'<ul>'+dues.map(function(d){return pnRow('<div class="when"><b>'+fmtD(d)+'</b></div>',wtxt(d),chipx(Object.keys(dd[d].g).length+' groups','blue'))}).join('')+'</ul>':'<p class="pn-e">No upcoming deadlines.</p>')+'</section>'+
-   (function(){var okd=DP&&!DP.loading&&!DP.err;if(!okd)return '<section class="pn"><div class="pn-h"><h2>Needs attention</h2></div><p class="pn-e">'+(DP&&DP.err?'Progress could not be loaded.':'Loading…')+'</p></section>';
-   var at=DP.groups.filter(function(G){var row=LEC.sched.filter(function(z){return z.group_no===G.g&&z.lab_code===dl})[0],k=row?lecState(row,today).k:'soon';return DP.total>0&&!G.cons&&(k==='open'||k==='past')});
-   return '<section class="pn"><div class="pn-h"><h2>Needs attention</h2><span>'+esc(dl)+'</span></div>'+(at.length?'<ul>'+at.slice(0,5).map(function(G){var d=G.members.filter(function(m){return progDone(m,DP.total)}).length;return pnRow('<span class="gc">G'+G.g+'</span>','<b>Group '+G.g+'</b><small>'+d+' of '+G.members.length+' done</small>',chipx(G.rev?'No group answer':'Answers pending','warn'))}).join('')+'</ul>':'<p class="pn-e">'+(DP.total?'No group is behind for '+esc(dl)+'.':'No questions added for '+esc(dl)+' yet.')+'</p>')+'</section>'})();
+   (function(){if(!dA||dA.loading||dA.err)return '<section class="pn"><div class="pn-h"><h2>Needs attention</h2></div><p class="pn-e">'+(dA&&dA.err?'Progress could not be loaded.':'Loading…')+'</p></section>';
+   return progAtt(progList(dA),today,true,5)})();
   content='<div class="dsh"><div class="dsh-main">'+ban+boxes+'</div><aside class="dsh-side">'+side+'</aside></div>';
  }else if(LVIEW==='prog'){
   var PV=progView(null,title,today);content='<div class="dsh"><div class="dsh-main">'+PV.main+'</div>'+(PV.side?'<aside class="dsh-side">'+PV.side+'</aside>':'')+'</div>';
@@ -851,9 +882,9 @@ function renderLecturerDesk(){
   if(contClick(e))return;
   if(refClick(e))return;
   var pl=e.target.closest&&e.target.closest('[data-pl]');
-  if(pl){PLAB=pl.getAttribute('data-pl');PGRP=null;renderLecturerDesk();return}
+  if(pl){PLAB=pl.getAttribute('data-pl')||null;PGRP=null;PFROM=0;renderLecturerDesk();return}
   var rv=e.target.closest&&e.target.closest('[data-rv]');
-  if(rv){var q=rv.getAttribute('data-rv').split('|');if(q[1]==='show'&&!confirm('Reveal Group '+q[0]+' answers for '+PLAB+' now? Students will see each other\'s answers and can no longer edit their own.'))return;revAct(q[0],PLAB,q[1]);return}
+  if(rv){var q=rv.getAttribute('data-rv').split('|'),rl=q[2]||PLAB;if(q[1]==='show'&&!confirm('Reveal Group '+q[0]+' answers for '+rl+' now? Students will see each other\'s answers and can no longer edit their own.'))return;revAct(q[0],rl,q[1]);return}
   var c=e.target.closest&&e.target.closest('[data-ov]');
   if(c){var a=c.getAttribute('data-ov').split('|');LSEL={g:a[0],lab:a[1],week:a[2]};renderLecturerDesk();return}
   var d=e.target.closest&&e.target.closest('[data-dact]');
